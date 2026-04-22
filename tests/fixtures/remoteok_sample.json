@@ -1,0 +1,51 @@
+[
+  {
+    "last_updated": "2026-04-22T12:00:00+00:00",
+    "legal": "https://remoteok.com/legal"
+  },
+  {
+    "id": "100001",
+    "epoch": 1745308800,
+    "position": "Senior ML Engineer",
+    "company": "DeepTech AI",
+    "location": "Worldwide",
+    "salary_min": 150000,
+    "salary_max": 200000,
+    "tags": ["python", "machine learning", "pytorch", "mlops"],
+    "url": "https://remoteok.com/remote-jobs/remote-senior-ml-engineer-deeptech-ai-100001",
+    "date": "2026-04-22T08:00:00+00:00",
+    "description": "We are hiring a senior ML engineer to build LLM-powered products.",
+    "slug": "remote-senior-ml-engineer-deeptech-ai-100001",
+    "original": true
+  },
+  {
+    "id": "100002",
+    "epoch": 1745222400,
+    "position": "Frontend Developer",
+    "company": "WebCo",
+    "location": "",
+    "salary_min": 80000,
+    "salary_max": 120000,
+    "tags": ["react", "javascript", "css"],
+    "url": "https://remoteok.com/remote-jobs/remote-frontend-developer-webco-100002",
+    "date": "2026-04-21T08:00:00+00:00",
+    "description": "Build beautiful user interfaces with React.",
+    "slug": "remote-frontend-developer-webco-100002",
+    "original": true
+  },
+  {
+    "id": "100003",
+    "epoch": 1745136000,
+    "position": "AI Research Scientist",
+    "company": "NeuroLabs",
+    "location": "US only",
+    "salary_min": 180000,
+    "salary_max": 250000,
+    "tags": ["ai", "deep learning", "transformer", "python"],
+    "url": "https://remoteok.com/remote-jobs/remote-ai-research-scientist-neurolabs-100003",
+    "date": "2026-04-20T08:00:00+00:00",
+    "description": "Research and develop foundation models for NLP tasks.",
+    "slug": "remote-ai-research-scientist-neurolabs-100003",
+    "original": true
+  }
+]

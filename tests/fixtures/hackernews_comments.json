@@ -1,0 +1,37 @@
+{
+  "hits": [
+    {
+      "objectID": "88880001",
+      "author": "ai_startup_ceo",
+      "created_at": "2026-04-01T15:05:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "Acme AI | Senior LLM Engineer | Remote | $180k-$250k<p>We are building the next generation of large language models. Looking for experienced engineers with deep learning and transformer expertise.<p>Stack: Python, PyTorch, CUDA<p>Apply: https://acme-ai.example.com/careers"
+    },
+    {
+      "objectID": "88880002",
+      "author": "webdev_hiring",
+      "created_at": "2026-04-01T15:10:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "CoolWeb Inc | Frontend Developer | NYC | $120k-$160k<p>Building modern web apps with React and TypeScript.<p>Looking for 3+ years experience with React."
+    },
+    {
+      "objectID": "88880003",
+      "author": "ml_team_lead",
+      "created_at": "2026-04-01T15:15:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "NeuroLabs | Computer Vision Researcher | Remote (US) | $200k+<p>Join our team building state-of-the-art computer vision and deep learning models for autonomous systems.<p>Requirements: PhD preferred, experience with PyTorch, neural networks."
+    },
+    {
+      "objectID": "88880004",
+      "author": "random_replier",
+      "created_at": "2026-04-01T16:00:00Z",
+      "parent_id": 88880001,
+      "story_id": 99999999,
+      "comment_text": "Is this position open to candidates outside the US?"
+    }
+  ],
+  "nbHits": 4
+}
