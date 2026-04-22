@@ -1,15 +1,60 @@
 # AIJobRadar
 
-A production-quality FastAPI service that scrapes AI/ML job listings from multiple remote job boards, normalizes them into a unified schema, caches results with TTL, and serves everything via a REST API.
+> Production-grade REST API that aggregates real-time AI/ML job listings from RemoteOK, WeWorkRemotely, and Hacker News — unified in a single endpoint.
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
+[![Tests](https://img.shields.io/badge/tests-66%20passed-brightgreen.svg)](#testing)
+[![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen.svg)](#testing)
+[![CI](https://github.com/stefanpesovic/AIJobRadar/actions/workflows/ci.yml/badge.svg)](https://github.com/stefanpesovic/AIJobRadar/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+<!-- [LIVE_DEMO_URL] — replace with Render deployment URL -->
+
+![Demo GIF](./docs/demo.gif)
+
+---
+
+## Why I Built This
+
+AI/ML job hunting is broken:
+
+1. **Listings are scattered** — RemoteOK, WeWorkRemotely, Hacker News "Who is hiring?", and dozens of other boards each have a fraction of the market. There's no single source of truth.
+2. **Formats are inconsistent** — One site returns JSON, another requires HTML scraping, another needs you to parse free-text comment threads. Comparing listings across sources is manual and tedious.
+3. **Filtering is weak** — Most job boards don't let you filter specifically for AI/ML roles. You end up scrolling through hundreds of irrelevant listings.
+
+**AIJobRadar** solves all three: it scrapes multiple sources concurrently, normalizes everything into a unified schema, filters by 23 AI/ML keywords, and serves the results through a clean REST API with pagination and search.
+
+*Built as part of the [5-Day AI Dev Challenge](https://github.com/stefanpesovic) — from zero to deployed in 5 days.*
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Client[Client<br/>curl / browser / Postman] -->|HTTP| API[FastAPI Server]
+    API --> Cache{Cache<br/>Fresh?}
+    Cache -->|Yes| Return[Return JSON]
+    Cache -->|No| Manager[Scraper Manager<br/>async orchestration]
+    Manager --> RemoteOK[RemoteOK<br/>JSON API]
+    Manager --> WWR[WeWorkRemotely<br/>HTML Parser]
+    Manager --> HN[Hacker News<br/>Algolia API]
+    RemoteOK --> Normalize[Normalize to<br/>unified Job schema]
+    WWR --> Normalize
+    HN --> Normalize
+    Normalize --> Filter[Filter by<br/>AI keywords]
+    Filter --> Store[Write to<br/>JSON cache]
+    Store --> Return
+```
 
 ## Features
 
-- **Multi-source scraping** — Aggregates jobs from RemoteOK, WeWorkRemotely, and Hacker News "Who is hiring?" threads
-- **AI/ML focused** — Filters listings using 25+ AI keywords (LLM, PyTorch, MLOps, computer vision, etc.)
-- **Unified schema** — Every job is normalized into the same Pydantic model regardless of source
+- **Multi-source aggregation** — Scrapes RemoteOK, WeWorkRemotely, and Hacker News concurrently
+- **AI/ML keyword filtering** — 23 configurable keywords (LLM, PyTorch, MLOps, RAG, computer vision, etc.)
+- **Unified schema** — Every job normalized into the same Pydantic model regardless of source
 - **Smart caching** — JSON file cache with configurable TTL avoids hammering source sites
 - **Filterable API** — Search by keyword, company, location, or source with pagination
-- **Swagger docs** — Interactive API documentation at `/docs`
+- **Graceful degradation** — One scraper failing doesn't take down the API
+- **Auto-generated docs** — Interactive Swagger UI at `/docs`
 - **Fully tested** — 66 tests with 89% code coverage
 
 ## Tech Stack
@@ -31,8 +76,8 @@ A production-quality FastAPI service that scrapes AI/ML job listings from multip
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/aijobradar.git
-cd aijobradar
+git clone https://github.com/stefanpesovic/AIJobRadar.git
+cd AIJobRadar
 
 # Create and activate a virtual environment (Python 3.11+)
 python3 -m venv venv
@@ -76,7 +121,29 @@ All filters are case-insensitive substring matches.
 **Example:**
 
 ```bash
-curl "http://localhost:8000/jobs?keyword=llm&source=remoteok&limit=5"
+curl "http://localhost:8000/jobs?source=weworkremotely&limit=1"
+```
+
+```json
+{
+  "total": 43,
+  "page": 1,
+  "limit": 1,
+  "jobs": [
+    {
+      "id": "weworkremotely_vanta-senior-software-engineer-ai-product",
+      "title": "Senior Software Engineer, AI Product",
+      "company": "Vanta",
+      "location": "San Francisco, US",
+      "salary": null,
+      "tags": ["Full-Time", "Anywhere in the World"],
+      "url": "https://weworkremotely.com/remote-jobs/vanta-senior-software-engineer-ai-product",
+      "source": "weworkremotely",
+      "posted_at": null,
+      "scraped_at": "2026-04-22T12:28:26.809833Z"
+    }
+  ]
+}
 ```
 
 ### `GET /sources` — Source Status
@@ -106,6 +173,27 @@ curl http://localhost:8000/health
 
 Interactive documentation is available at **http://localhost:8000/docs**.
 
+## Docker
+
+```bash
+# Build the image
+docker build -t aijobradar .
+
+# Run the container
+docker run -p 8000:8000 aijobradar
+
+# Access the API
+curl http://localhost:8000/jobs?limit=5
+```
+
+## Engineering Decisions & Trade-offs
+
+- **JSON file cache over SQLite** — For a single-instance service with ephemeral scraped data, a flat JSON file with TTL is simpler to deploy and debug — no migrations, no ORM, and the cache is human-readable. For a production multi-instance deployment, this would be swapped for Redis.
+- **Async scraping with httpx** — All three scrapers run concurrently via `asyncio.gather()` in the `ScraperManager`, so total scrape time equals the slowest source (~2-3s) instead of the sum of all three (~6-9s sequential).
+- **Abstract BaseScraper pattern** — Each source implements a `scrape() -> list[Job]` interface. Adding a new source (e.g., LinkedIn, Indeed) means adding one file with zero changes to the orchestration layer or API routes.
+- **Graceful degradation** — Each scraper catches its own exceptions and returns `[]` on failure. If RemoteOK goes down, WeWorkRemotely and Hacker News results still serve normally — one broken source never crashes the API.
+- **Keyword filter in config, not code** — The 23 AI/ML keywords live in `Settings.AI_KEYWORDS` (loaded via pydantic-settings), which can be overridden via environment variable without touching code or redeploying.
+
 ## Project Structure
 
 ```
@@ -134,10 +222,15 @@ aijobradar/
 │   ├── test_scrapers.py      # Scraper tests with mocked HTTP
 │   └── fixtures/             # Sample HTML/JSON for tests
 ├── data/                     # Cache directory
+├── docs/                     # Demo media (GIF, screenshots)
+├── .github/workflows/ci.yml  # GitHub Actions CI
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
 ├── pyproject.toml
+├── Dockerfile
+├── .dockerignore
+├── CHANGELOG.md
 ├── run.py
 ├── LICENSE
 └── README.md
@@ -190,6 +283,19 @@ All settings can be overridden via environment variables or a `.env` file. See `
 | WeWorkRemotely   | HTML scraping             | Category page fallback if search is blocked     |
 | Hacker News      | Algolia API               | Parses latest "Who is hiring?" thread comments  |
 
+## Roadmap
+
+- **Database backend** — Migrate from JSON file cache to PostgreSQL or SQLite for persistent storage and richer queries
+- **Notifications** — Email or Slack alerts when new jobs match custom keyword profiles
+- **More sources** — Add LinkedIn, Indeed, and Glassdoor scrapers using the existing `BaseScraper` interface
+- **Dashboard UI** — React or HTMX frontend for browsing and bookmarking jobs
+
+## Author
+
+**Stefan Pesovic** — [GitHub](https://github.com/stefanpesovic)
+
+Built as part of the **5-Day AI Dev Challenge**.
+
 ## License
 
-MIT
+[MIT](LICENSE)

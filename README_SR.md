@@ -31,7 +31,7 @@ FastAPI servis produkcijskog kvaliteta koji prikuplja oglase za AI/ML poslove sa
 
 ```bash
 # Kloniraj repozitorijum
-git clone https://github.com/YOUR_USERNAME/aijobradar.git
+git clone https://github.com/stefanpesovic/AIJobRadar.git
 cd aijobradar
 
 # Napravi i aktiviraj virtualno okruzenje (Python 3.11+)

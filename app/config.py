@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     CACHE_FILE_PATH: Path = Path("data/jobs_cache.json")
     USER_AGENT: str = (
-        "Mozilla/5.0 (AIJobRadar/1.0; +https://github.com/YOUR_USERNAME/aijobradar)"
+        "Mozilla/5.0 (AIJobRadar/1.0; +https://github.com/stefanpesovic/AIJobRadar)"
     )
     AI_KEYWORDS: list[str] = [
         "ai",
