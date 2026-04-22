@@ -17,6 +17,7 @@ class Job(BaseModel):
     location: str | None = None
     salary: str | None = None
     tags: list[str] = Field(default_factory=list)
+    description: str | None = None
     url: str
     source: SourceName
     posted_at: datetime | None = None

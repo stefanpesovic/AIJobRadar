@@ -24,6 +24,25 @@ COMMENTS_URL_TEMPLATE = (
     "&hitsPerPage=200"
 )
 
+# Regex matching a standalone URL (http/https or www.)
+_URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+
+# Words commonly found in job titles — used to positively identify title parts
+_ROLE_WORDS_RE = re.compile(
+    r"\b(?:engineer|developer|designer|manager|lead|director|architect"
+    r"|scientist|researcher|analyst|specialist|consultant|coordinator"
+    r"|head|founder|product|data|software|frontend|backend|full.?stack"
+    r"|devops|sre|platform|infrastructure|staff|senior|junior|principal"
+    r"|intern|vp|cto|haskell|python|java|golang|rust)\b",
+    re.IGNORECASE,
+)
+
+# Minimum length for a title to be considered valid
+_MIN_TITLE_LENGTH = 15
+
+# Maximum title length before truncation
+_MAX_TITLE_LENGTH = 80
+
 
 class HackerNewsScraper(BaseScraper):
     """Scrapes job postings from the latest HN 'Who is hiring?' thread.
@@ -44,8 +63,7 @@ class HackerNewsScraper(BaseScraper):
 
             comments = await self._fetch_comments(story_id)
             jobs = self._parse_comments(comments, story_id)
-            logger.info("HN returned %d AI jobs from story %s", len(jobs), story_id)
-            return jobs[: settings.MAX_JOBS_PER_SOURCE]
+            return self.apply_ai_filter(jobs)[: settings.MAX_JOBS_PER_SOURCE]
 
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             logger.error("HN scrape failed: %s", exc)
@@ -93,12 +111,16 @@ class HackerNewsScraper(BaseScraper):
             if not text:
                 continue
 
-            # Check AI relevance
             plain_text = self._strip_html(text)
-            if not self.matches_ai_keywords(plain_text):
+
+            if not self._is_valid_posting(plain_text):
                 continue
 
-            company, title = self._extract_company_and_title(plain_text)
+            result = self._extract_company_and_title(plain_text)
+            if result is None:
+                continue
+
+            company, title = result
             comment_id = comment.get("objectID", "")
             posted_at = self._parse_date(comment.get("created_at"))
 
@@ -110,6 +132,7 @@ class HackerNewsScraper(BaseScraper):
                     url=f"https://news.ycombinator.com/item?id={comment_id}",
                     source="hackernews",
                     tags=self._extract_tags(plain_text),
+                    description=plain_text,
                     posted_at=posted_at,
                     scraped_at=now,
                 )
@@ -119,34 +142,94 @@ class HackerNewsScraper(BaseScraper):
 
     @staticmethod
     def _strip_html(text: str) -> str:
-        """Remove HTML tags and decode entities."""
-        clean = re.sub(r"<[^>]+>", " ", text)
+        """Remove HTML tags and decode entities, preserving paragraph breaks."""
+        # Replace paragraph/break tags with newlines first
+        clean = re.sub(r"<(?:p|br)\s*/?>", "\n", text, flags=re.IGNORECASE)
+        # Remove remaining HTML tags
+        clean = re.sub(r"<[^>]+>", " ", clean)
         clean = html.unescape(clean)
-        # Normalize whitespace
-        return re.sub(r"\s+", " ", clean).strip()
+        # Normalize whitespace within each line, preserve line breaks
+        lines = clean.split("\n")
+        lines = [re.sub(r"\s+", " ", line).strip() for line in lines]
+        return "\n".join(line for line in lines if line)
 
     @staticmethod
-    def _extract_company_and_title(plain_text: str) -> tuple[str, str]:
+    def _is_valid_posting(plain_text: str) -> bool:
+        """Return True if the comment looks like a genuine job posting."""
+        # Too short to be a real posting
+        if len(plain_text) < _MIN_TITLE_LENGTH:
+            return False
+
+        # Text is only a URL (no meaningful content)
+        stripped = _URL_RE.sub("", plain_text).strip()
+        return len(stripped) >= _MIN_TITLE_LENGTH
+
+    def _extract_company_and_title(
+        self,
+        plain_text: str,
+    ) -> tuple[str, str] | None:
         """Best-effort extraction of company and title from first line.
 
         HN hiring comments typically start with:
             "Company Name | Role Title | Location | ..."
+        or  "Company Name is hiring ..."
+
+        Returns None if the extracted title is garbage (URL-only, too short).
         """
         first_line = plain_text.split("\n")[0].strip()
-        # Many posts use pipe-delimited format
-        parts = [p.strip() for p in first_line.split("|")]
+
+        # Strip URLs from first line before parsing
+        clean_line = _URL_RE.sub("", first_line).strip()
+        # Collapse leftover whitespace / trailing separators
+        clean_line = re.sub(r"\s+", " ", clean_line).strip(" |:-")
+
+        # If the cleaned first line is too short, skip entirely
+        if len(clean_line) < _MIN_TITLE_LENGTH:
+            return None
+
+        # Try pipe-delimited format: "Company | Title | Location | ..."
+        parts = [p.strip() for p in clean_line.split("|")]
+        parts = [p for p in parts if p]  # drop empty segments
 
         if len(parts) >= 2:
-            return parts[0], parts[1]
-        # Fallback: use the first line as both
-        truncated = first_line[:120] if len(first_line) > 120 else first_line
-        return "Unknown", truncated or "HN Job Posting"
+            company = parts[0]
+            # Find the best title: must contain a role word or AI keyword
+            title = None
+            for part in parts[1:]:
+                if "@" in part:
+                    continue
+                if _ROLE_WORDS_RE.search(part) or self.matches_ai_keywords(part):
+                    title = part
+                    break
+            if title is None:
+                return None
+        else:
+            # Try "Company is hiring" pattern
+            match = re.match(r"^(.+?)\s+is\s+hiring\b", clean_line, re.IGNORECASE)
+            if match:
+                company = match.group(1).strip()
+                title = clean_line
+            else:
+                company = "Unknown"
+                title = clean_line
+
+        # Truncate title at word boundary near _MAX_TITLE_LENGTH
+        if len(title) > _MAX_TITLE_LENGTH:
+            truncated = title[:_MAX_TITLE_LENGTH]
+            # Cut at last space to avoid breaking mid-word
+            last_space = truncated.rfind(" ")
+            if last_space > _MAX_TITLE_LENGTH // 2:
+                truncated = truncated[:last_space]
+            title = truncated
+
+        return company, title
 
     @staticmethod
     def _extract_tags(plain_text: str) -> list[str]:
         """Extract AI-related tags found in the text."""
-        lowered = plain_text.lower()
-        return [kw for kw in settings.AI_KEYWORDS if kw in lowered]
+        from app.scrapers.base import _AI_PATTERN
+
+        return list({m.lower() for m in _AI_PATTERN.findall(plain_text)})
 
     @staticmethod
     def _parse_date(date_str: str | None) -> datetime | None:

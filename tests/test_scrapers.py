@@ -7,6 +7,7 @@ import httpx
 import pytest
 import respx
 
+from app.scrapers.base import BaseScraper
 from app.scrapers.hackernews import (
     COMMENTS_URL_TEMPLATE,
     STORY_SEARCH_URL,
@@ -76,6 +77,21 @@ class TestRemoteOKApi:
         titles = {j.title for j in jobs}
 
         assert "Frontend Developer" not in titles
+
+    @respx.mock
+    async def test_excludes_substring_false_positives(
+        self, api_json: list[dict]
+    ) -> None:
+        """Jobs with 'ai' only as substring (email, maintain) must be excluded."""
+        respx.get(API_URL).mock(return_value=httpx.Response(200, json=api_json))
+
+        scraper = RemoteOKScraper()
+        jobs = await scraper.scrape()
+        titles = {j.title for j in jobs}
+
+        # "Email Marketing Manager" has "ai" in "email"/"maintain"/"availability"
+        # but no real AI keywords — must be filtered out
+        assert "Email Marketing Manager" not in titles
 
     @respx.mock
     async def test_returns_empty_on_network_error(self) -> None:
@@ -289,9 +305,9 @@ class TestHackerNews:
         scraper = HackerNewsScraper()
         jobs = await scraper.scrape()
 
-        # Fixture: 4 comments — 2 AI-relevant top-level, 1 non-AI top-level,
-        # 1 reply (not top-level). Should return 2 jobs.
-        assert len(jobs) == 2
+        # Fixture: 7 comments — 3 AI-relevant top-level, 1 non-AI top-level,
+        # 1 reply, 1 URL-only garbage, 1 too-short garbage. Should return 3 jobs.
+        assert len(jobs) == 3
         companies = {j.company for j in jobs}
         assert "Acme AI" in companies
         assert "NeuroLabs" in companies
@@ -372,6 +388,47 @@ class TestHackerNews:
         assert "deep learning" in acme_job.tags
 
     @respx.mock
+    async def test_rejects_garbage_comments(
+        self, story_json: dict, comments_json: dict, comments_url: str
+    ) -> None:
+        """URL-only comments and too-short text must be rejected."""
+        respx.get(STORY_SEARCH_URL).mock(
+            return_value=httpx.Response(200, json=story_json)
+        )
+        respx.get(comments_url).mock(
+            return_value=httpx.Response(200, json=comments_json)
+        )
+
+        scraper = HackerNewsScraper()
+        jobs = await scraper.scrape()
+        ids = {j.id for j in jobs}
+
+        # URL-only comment (ebay link)
+        assert "hackernews_88880005" not in ids
+        # Too-short comment ("We are hiring")
+        assert "hackernews_88880006" not in ids
+
+    @respx.mock
+    async def test_strips_urls_from_title(
+        self, story_json: dict, comments_json: dict, comments_url: str
+    ) -> None:
+        """Titles must not contain raw URLs."""
+        respx.get(STORY_SEARCH_URL).mock(
+            return_value=httpx.Response(200, json=story_json)
+        )
+        respx.get(comments_url).mock(
+            return_value=httpx.Response(200, json=comments_json)
+        )
+
+        scraper = HackerNewsScraper()
+        jobs = await scraper.scrape()
+        url_job = next(j for j in jobs if j.id == "hackernews_88880007")
+
+        assert "https://" not in url_job.title
+        assert "http://" not in url_job.title
+        assert "Machine Learning Engineer" in url_job.title
+
+    @respx.mock
     async def test_returns_empty_on_no_story(self) -> None:
         respx.get(STORY_SEARCH_URL).mock(
             return_value=httpx.Response(200, json={"hits": []})
@@ -399,3 +456,32 @@ class TestHackerNews:
         jobs = await scraper.scrape()
 
         assert jobs == []
+
+
+# ---------------------------------------------------------------------------
+# AI Keyword Matching Unit Tests
+# ---------------------------------------------------------------------------
+
+
+class TestAIKeywordMatching:
+    """Tests for the word-boundary AI keyword matching logic."""
+
+    def test_matches_llms_plural(self) -> None:
+        """The plural 'LLMs' must be recognized as an AI keyword."""
+        assert BaseScraper.matches_ai_keywords("Working with LLMs and embeddings")
+        assert BaseScraper.matches_ai_keywords("Our team builds production llms")
+
+    def test_rejects_ai_as_substring(self) -> None:
+        """Words containing 'ai' as a substring must not trigger a match."""
+        assert not BaseScraper.matches_ai_keywords(
+            "Send us an email and maintain availability"
+        )
+        assert not BaseScraper.matches_ai_keywords("Detailed campaign domain work")
+
+    def test_matches_new_keywords(self) -> None:
+        """Newly added keywords (gpt, claude, openai, etc.) must match."""
+        assert BaseScraper.matches_ai_keywords("Experience with GPT-4 required")
+        assert BaseScraper.matches_ai_keywords("Building on Claude and OpenAI APIs")
+        assert BaseScraper.matches_ai_keywords("Anthropic partnership team")
+        assert BaseScraper.matches_ai_keywords("Fine-tuning large models")
+        assert BaseScraper.matches_ai_keywords("Vector database experience needed")

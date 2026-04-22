@@ -30,7 +30,7 @@ class RemoteOKScraper(BaseScraper):
         if not jobs:
             logger.warning("RemoteOK API failed, trying HTML fallback")
             jobs = await self._scrape_html()
-        return jobs[: settings.MAX_JOBS_PER_SOURCE]
+        return self.apply_ai_filter(jobs)[: settings.MAX_JOBS_PER_SOURCE]
 
     async def _scrape_api(self) -> list[Job]:
         """Fetch jobs via the RemoteOK JSON API."""
@@ -49,16 +49,6 @@ class RemoteOKScraper(BaseScraper):
             jobs: list[Job] = []
             now = datetime.now(UTC)
             for entry in entries:
-                searchable = " ".join(
-                    [
-                        entry.get("position", ""),
-                        " ".join(entry.get("tags", [])),
-                        entry.get("description", ""),
-                    ]
-                )
-                if not self.matches_ai_keywords(searchable):
-                    continue
-
                 salary = self._format_salary(
                     entry.get("salary_min"), entry.get("salary_max")
                 )
@@ -79,7 +69,6 @@ class RemoteOKScraper(BaseScraper):
                     )
                 )
 
-            logger.info("RemoteOK API returned %d AI jobs", len(jobs))
             return jobs
 
         except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
@@ -117,10 +106,6 @@ class RemoteOKScraper(BaseScraper):
                 tags_els = row.select("div.tags a.tag span")
                 tags = [t.get_text(strip=True) for t in tags_els]
 
-                searchable = f"{title} {' '.join(tags)}"
-                if not self.matches_ai_keywords(searchable):
-                    continue
-
                 jobs.append(
                     Job(
                         id=f"remoteok_{job_id}",
@@ -133,7 +118,6 @@ class RemoteOKScraper(BaseScraper):
                     )
                 )
 
-            logger.info("RemoteOK HTML fallback returned %d AI jobs", len(jobs))
             return jobs
 
         except (httpx.HTTPError, ValueError, AttributeError) as exc:

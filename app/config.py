@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         "ml engineer",
         "deep learning",
         "llm",
+        "llms",
         "large language model",
         "nlp",
         "mlops",
@@ -39,6 +40,8 @@ class Settings(BaseSettings):
         "tensorflow",
         "generative ai",
         "genai",
+        "gpt",
+        "claude",
         "rag",
         "computer vision",
         "data scientist",
@@ -51,6 +54,13 @@ class Settings(BaseSettings):
         "foundation model",
         "agent",
         "autonomous agent",
+        "vector database",
+        "embeddings",
+        "fine-tuning",
+        "finetuning",
+        "hugging face",
+        "openai",
+        "anthropic",
     ]
 
 

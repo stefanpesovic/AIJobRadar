@@ -33,7 +33,7 @@ class WeWorkRemotelyScraper(BaseScraper):
         if not jobs:
             logger.warning("WWR search failed, trying category fallback")
             jobs = await self._scrape_url(CATEGORY_URL)
-        return jobs[: settings.MAX_JOBS_PER_SOURCE]
+        return self.apply_ai_filter(jobs)[: settings.MAX_JOBS_PER_SOURCE]
 
     async def _scrape_url(self, url: str) -> list[Job]:
         """Fetch and parse jobs from a given WWR page URL."""
@@ -95,11 +95,6 @@ class WeWorkRemotelyScraper(BaseScraper):
             # Build unique ID from the URL slug
             job_id = href.strip("/").split("/")[-1] if href else ""
 
-            # AI keyword check against title + tags
-            searchable = f"{title} {' '.join(tags)}"
-            if not self.matches_ai_keywords(searchable):
-                continue
-
             jobs.append(
                 Job(
                     id=f"weworkremotely_{job_id}",
@@ -114,7 +109,6 @@ class WeWorkRemotelyScraper(BaseScraper):
                 )
             )
 
-        logger.info("WWR returned %d AI jobs", len(jobs))
         return jobs
 
     @staticmethod

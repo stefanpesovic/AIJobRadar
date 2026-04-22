@@ -47,5 +47,20 @@
     "description": "Research and develop foundation models for NLP tasks.",
     "slug": "remote-ai-research-scientist-neurolabs-100003",
     "original": true
+  },
+  {
+    "id": "100004",
+    "epoch": 1745050000,
+    "position": "Email Marketing Manager",
+    "company": "SpamCorp",
+    "location": "Remote",
+    "salary_min": 60000,
+    "salary_max": 90000,
+    "tags": ["marketing", "email", "campaigns"],
+    "url": "https://remoteok.com/remote-jobs/remote-email-marketing-manager-spamcorp-100004",
+    "date": "2026-04-19T08:00:00+00:00",
+    "description": "Maintain email campaigns and availability of marketing materials.",
+    "slug": "remote-email-marketing-manager-spamcorp-100004",
+    "original": true
   }
 ]

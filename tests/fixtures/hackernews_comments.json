@@ -31,7 +31,31 @@
       "parent_id": 88880001,
       "story_id": 99999999,
       "comment_text": "Is this position open to candidates outside the US?"
+    },
+    {
+      "objectID": "88880005",
+      "author": "url_spammer",
+      "created_at": "2026-04-01T16:05:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "https://www.ebay.com/careers/ai-engineer"
+    },
+    {
+      "objectID": "88880006",
+      "author": "short_poster",
+      "created_at": "2026-04-01T16:10:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "We are hiring"
+    },
+    {
+      "objectID": "88880007",
+      "author": "url_in_title",
+      "created_at": "2026-04-01T16:15:00Z",
+      "parent_id": 99999999,
+      "story_id": 99999999,
+      "comment_text": "Machine Learning Engineer - https://jobs.apple.com/en-us/details/200554359/machine-learning-engineer<p>Work on cutting-edge AI and deep learning models."
     }
   ],
-  "nbHits": 4
+  "nbHits": 7
 }
